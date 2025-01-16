@@ -58,8 +58,10 @@ gpconfig -c yezzey.use_gpg_crypto -v "false"
 
 gpstop -a -i && gpstart -a
 
-
 createdb $USER
+
+#run yproxy in daemon mode
+/usr/bin/yproxy -c /tmp/yproxy.conf -ldebug &
 
 # Run tests
 psql postgres -f ./gpcontrib/yezzey/test/regress/expirity.sql

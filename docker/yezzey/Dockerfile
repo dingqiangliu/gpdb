@@ -74,7 +74,7 @@ RUN sudo chown -R krebs:root /home/krebs \
 
 RUN  git submodule update --init 
 RUN rm -fr gpcontrib/yezzey 
-
+# Fetch latest yezzey version
 RUN git clone https://github.com/open-gpdb/yezzey.git gpcontrib/yezzey -b ${YEZZEY_REF} && cd /home/krebs 
 
 RUN sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control 
@@ -84,6 +84,6 @@ RUN make -j8 && make -j8 install
 
 RUN sed -i "s/\$AWS_ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yproxy.conf \
 && sed -i "s/\$AWS_SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yproxy.conf \
-&& sed -i "s/\$WALG_S3_PREFIX/s3:\/\/${bucketName}\/yezzey-test-files/g" yezzey_test/yproxy.conf
+&& sed -i "s/\$WALG_S3_PREFIX/s3:\/\/${bucketName}\/yezzey-test-files/g" yezzey_test/yproxy.conf && cp yezzey_test/yproxy.conf /tmp/yproxy.yaml 
 
 ENTRYPOINT ["./yezzey_test/run_tests.sh"]
