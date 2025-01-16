@@ -2,9 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "OPENGPDB_STABLE" ]
+    branches: [ "OPENGPDB_STABLE", "MDB_6_25_STABLE_YEZZEY" ]
   pull_request:
-    branches: [ "OPENGPDB_STABLE", "YGP_6.27_STABLE" ]
+    branches: [ "OPENGPDB_STABLE", "YGP_6.27_STABLE", "MDB_6_25_STABLE_YEZZEY" ]
 
 jobs:
 
