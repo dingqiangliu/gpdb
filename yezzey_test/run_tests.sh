@@ -61,7 +61,7 @@ gpstop -a -i && gpstart -a
 createdb $USER
 
 #run yproxy in daemon mode
-/usr/bin/yproxy -c /tmp/yproxy.conf -ldebug &
+/usr/bin/yproxy -c /tmp/yproxy.yaml -ldebug &
 
 # Run tests
 psql postgres -f ./gpcontrib/yezzey/test/regress/expirity.sql
