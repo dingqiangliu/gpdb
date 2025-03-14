@@ -38,6 +38,10 @@ static TupleTableSlot *SeqNext(SeqScanState *node);
 
 static void InitAOCSScanOpaque(SeqScanState *scanState, Relation currentRelation);
 
+static bool PassByBloomFilter(SeqScanState *node, TupleTableSlot *slot);
+
+extern bool gp_enable_runtime_filter_pushdown;
+
 /* ----------------------------------------------------------------
  *						Scan Support
  * ----------------------------------------------------------------
@@ -64,41 +68,49 @@ SeqNext(SeqScanState *node)
 	direction = estate->es_direction;
 	slot = node->ss.ss_ScanTupleSlot;
 
-	/*
-	 * get the next tuple from the table
-	 */
-	if (node->ss_currentScanDesc_ao)
+	bool have_more_tuples = true;
+	while (have_more_tuples)
 	{
-		appendonly_getnext(node->ss_currentScanDesc_ao, direction, slot);
-	}
-	else if (node->ss_currentScanDesc_aocs)
-	{
-		aocs_getnext(node->ss_currentScanDesc_aocs, direction, slot);
-	}
-	else
-	{
-		HeapScanDesc scandesc = node->ss_currentScanDesc_heap;
-
-		tuple = heap_getnext(scandesc, direction);
-
 		/*
-		 * save the tuple and the buffer returned to us by the access methods in
-		 * our scan tuple slot and return the slot.  Note: we pass 'false' because
-		 * tuples returned by heap_getnext() are pointers onto disk pages and were
-		 * not created with palloc() and so should not be pfree()'d.  Note also
-		 * that ExecStoreTuple will increment the refcount of the buffer; the
-		 * refcount will not be dropped until the tuple table slot is cleared.
-		 */
-		if (tuple)
-			ExecStoreHeapTuple(tuple,	/* tuple to store */
-						   slot,	/* slot to store in */
-						   scandesc->rs_cbuf,		/* buffer associated with this
-													 * tuple */
-						   false);	/* don't pfree this pointer */
+		* get the next tuple from the table
+		*/
+		if (node->ss_currentScanDesc_ao)
+		{
+			have_more_tuples = appendonly_getnext(node->ss_currentScanDesc_ao, direction, slot);
+		}
+		else if (node->ss_currentScanDesc_aocs)
+		{
+			have_more_tuples = aocs_getnext(node->ss_currentScanDesc_aocs, direction, slot);
+		}
 		else
-			ExecClearTuple(slot);
-	}
+		{
+			HeapScanDesc scandesc = node->ss_currentScanDesc_heap;
 
+			tuple = heap_getnext(scandesc, direction);
+
+			/*
+			* save the tuple and the buffer returned to us by the access methods in
+			* our scan tuple slot and return the slot.  Note: we pass 'false' because
+			* tuples returned by heap_getnext() are pointers onto disk pages and were
+			* not created with palloc() and so should not be pfree()'d.  Note also
+			* that ExecStoreTuple will increment the refcount of the buffer; the
+			* refcount will not be dropped until the tuple table slot is cleared.
+			*/
+			if (tuple)
+				ExecStoreHeapTuple(tuple,	/* tuple to store */
+							slot,	/* slot to store in */
+							scandesc->rs_cbuf,		/* buffer associated with this
+														* tuple */
+							false);	/* don't pfree this pointer */
+			else
+			{
+				ExecClearTuple(slot);
+				have_more_tuples = false;
+			}
+		}
+		if (!have_more_tuples || PassByBloomFilter(node, slot))
+			break;
+	}
 	return slot;
 }
 
@@ -395,4 +407,45 @@ InitAOCSScanOpaque(SeqScanState *scanstate, Relation currentRelation)
 
 	scanstate->ss_aocs_ncol = ncol;
 	scanstate->ss_aocs_proj = proj;
+}
+
+/*
+ * Returns true if the element may be in the bloom filter.
+ */
+static bool
+PassByBloomFilter(SeqScanState *node, TupleTableSlot *slot)
+{
+	ScanKey	sk;
+	Datum	val;
+	bool	isnull;
+	ListCell *lc;
+	bloom_filter *blm_filter;
+
+	/*
+	 * Mark that the pushdown runtime filter is actually taking effect.
+	 */
+	if (node->ss.ps.instrument &&
+		!node->ss.ps.instrument->prf_work &&
+		list_length(node->filters))
+		node->ss.ps.instrument->prf_work = true;
+
+	foreach (lc, node->filters)
+	{
+		sk = lfirst(lc);
+		if (sk->sk_flags != SK_BLOOM_FILTER)
+			continue;
+
+		val = slot_getattr(slot, sk->sk_attno, &isnull);
+		if (isnull)
+					continue;
+
+		blm_filter = (bloom_filter *)DatumGetPointer(sk->sk_argument);
+		if (bloom_lacks_element(blm_filter, (unsigned char *)&val, sizeof(Datum)))
+		{
+			InstrCountFilteredPRF(node, 1);
+			return false;
+		}
+	}
+
+	return true;
 }

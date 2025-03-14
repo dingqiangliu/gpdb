@@ -24,4 +24,7 @@ extern bool bloom_lacks_element(bloom_filter *filter, unsigned char *elem,
 					size_t len);
 extern double bloom_prop_bits_set(bloom_filter *filter);
 
+extern bloom_filter *bloom_create_aggresive(int64 total_elems,
+											int work_mem, uint64 seed);
+
 #endif							/* BLOOMFILTER_H */

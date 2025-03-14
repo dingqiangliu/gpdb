@@ -55,6 +55,7 @@ typedef struct Instrumentation
 	bool		need_timer;		/* TRUE if we need timer data */
 	bool		need_cdb;		/* TRUE if we need cdb statistics */
 	bool		need_bufusage;	/* TRUE if we need buffer usage data */
+	bool		prf_work;		/* true if pushdown runtime filters really work */
 	/* Info about current plan cycle: */
 	bool		running;		/* TRUE if we've completed first tuple */
 	instr_time	starttime;		/* Start time of current iteration of node */
@@ -69,6 +70,7 @@ typedef struct Instrumentation
 	uint64		nloops;			/* # of run cycles for this node */
 	double		nfiltered1;		/* # tuples removed by scanqual or joinqual */
 	double		nfiltered2;		/* # tuples removed by "other" quals */
+	double		nfilteredPRF;	/* # tuples removed by pushdown runtime filter */
 	BufferUsage	bufusage;		/* Total buffer usage */
 
 	double		execmemused;	/* CDB: executor memory used (bytes) */

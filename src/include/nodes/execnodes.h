@@ -19,6 +19,7 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "executor/instrument.h"
+#include "lib/bloomfilter.h"
 #include "nodes/params.h"
 #include "nodes/plannodes.h"
 #include "utils/reltrigger.h"
@@ -1468,7 +1469,11 @@ static inline void Gpmon_Incr_Rows_Out(gpmon_packet_t *pkt)
 		if (((PlanState *)(node))->instrument) \
 			((PlanState *)(node))->instrument->nfiltered2 += (delta); \
 	} while(0)
-
+#define InstrCountFilteredPRF(node, delta) \
+	do { \
+		if (((PlanState *)(node))->instrument) \
+			((PlanState *)(node))->instrument->nfilteredPRF += (delta); \
+	} while(0)
 /*
  * EPQState is state for executing an EvalPlanQual recheck on a candidate
  * tuple in ModifyTable or LockRows.  The estate and planstate fields are
@@ -1702,7 +1707,25 @@ typedef struct SeqScanState
 	/* extra state for AOCS scans */
 	bool	   *ss_aocs_proj;
 	int			ss_aocs_ncol;
+
+	List		*filters;			/* the list of struct ScanKeyData */
+	bool		filter_in_seqscan;	/* check scan slot with runtime filters in
+                                       seqscan node or in am */
 } SeqScanState;
+
+typedef struct AttrFilter
+{
+	bool			empty;  /* empty filter or not */
+	PlanState		*target;/* the node in where runtime filter will be used,
+							   target will be seqscan, see FindTargetAttr().
+							   in nodeHashjoin.c */
+	AttrNumber		rattno;	/* attr no in hash node */
+	AttrNumber		lattno;	/* if target is seqscan, attr no in relation */
+
+	bloom_filter	*blm_filter;
+	Datum			min;
+	Datum			max;
+} AttrFilter;
 
 /*
  * These structs store information about index quals that don't have simple
@@ -2435,6 +2458,10 @@ typedef struct HashJoinState
 	/* set if the operator created workfiles */
 	bool workfiles_created;
 	bool reuse_hashtable; /* Do we need to preserve hash table to support rescan */
+
+	int matched_outer;
+	int checked_outer;
+	bool first_match;
 } HashJoinState;
 
 
@@ -2733,6 +2760,7 @@ typedef struct HashState
 	bool		hs_quit_if_hashkeys_null;	/* quit building hash table if hashkeys are all null */
 	bool		hs_hashkeys_null;	/* found an instance wherein hashkeys are all null */
 	/* hashkeys is same as parent's hj_InnerHashKeys */
+	List *filters;  /* the list of AttrFilter */
 } HashState;
 
 /* ----------------

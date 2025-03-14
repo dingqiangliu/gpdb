@@ -46,6 +46,7 @@
 extern char *SerializeDXLPlan(Query *parse);
 #endif
 
+extern bool gp_enable_runtime_filter_pushdown;
 
 /* Crude hack to avoid changing sizeof(ExplainState) in released branches */
 #define grouping_stack extra->groupingstack
@@ -135,6 +136,9 @@ static void ExplainXMLTag(const char *tagname, int flags, ExplainState *es);
 static void ExplainJSONLineEnding(ExplainState *es);
 static void ExplainYAMLLineStarting(ExplainState *es);
 static void escape_yaml(StringInfo buf, const char *str);
+static void show_pushdown_runtime_filter_info(const char *qlabel,
+											  PlanState *planstate,
+											  ExplainState *es);
 
 /* Include the Greenplum EXPLAIN extensions */
 #include "explain_gp.c"
@@ -2009,6 +2013,10 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			break;
 		}
 		case T_SeqScan:
+			if (gp_enable_runtime_filter_pushdown && IsA(planstate, SeqScanState))
+				show_pushdown_runtime_filter_info("Rows Removed by Pushdown Runtime Filter",
+												planstate, es);
+			[[fallthrough]];
 		case T_DynamicSeqScan:
 		case T_ExternalScan:
 		case T_ValuesScan:
@@ -2848,6 +2856,24 @@ show_instrumentation_count(const char *qlabel, int which,
 		else
 			ExplainPropertyFloat(qlabel, 0.0, 0, es);
 	}
+}
+
+/*
+ * If it's EXPLAIN ANALYZE, show instrumentation information with pushdown
+ * runtime filter.
+ */
+static void
+show_pushdown_runtime_filter_info(const char *qlabel,
+								  PlanState *planstate,
+								  ExplainState *es)
+{
+	Assert(gp_enable_runtime_filter_pushdown && IsA(planstate, SeqScanState));
+
+	if (!es->analyze || !planstate->instrument)
+		return;
+
+	if (planstate->instrument->prf_work)
+		ExplainPropertyFloat(qlabel, planstate->instrument->nfilteredPRF, 0, es);
 }
 
 /*

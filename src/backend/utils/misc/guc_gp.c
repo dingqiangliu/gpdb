@@ -162,6 +162,7 @@ bool        gp_use_synchronize_seqscans_catalog_vacuum_full = false;
 
 bool		log_dispatch_stats = false;
 bool		gp_keep_partition_children_locks = false;
+extern bool gp_enable_runtime_filter_pushdown;
 
 int			explain_memory_verbosity = 0;
 char	   *memory_profiler_run_id = "none";
@@ -3435,6 +3436,16 @@ struct config_bool ConfigureNamesBool_gp[] =
 		false,
 		NULL, NULL, NULL
 	},
+
+	{
+		{"gp_enable_runtime_filter_pushdown", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Try to push the hash table of hash join to the seqscan or AM as bloom filter."),
+			NULL
+		},
+		&gp_enable_runtime_filter_pushdown,
+		false,
+		NULL, NULL, NULL
+	},	
 
 	/* End-of-list marker */
 	{

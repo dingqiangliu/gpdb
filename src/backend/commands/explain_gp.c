@@ -102,6 +102,8 @@ typedef struct CdbExplain_StatInst
 	double		total;			/* Total total time (in seconds) */
 	double		ntuples;		/* Total tuples produced */
 	double		nloops;			/* # of run cycles for this node */
+	bool		prf_work;
+	double		nfilteredPRF;
 	double		execmemused;	/* executor memory used (bytes) */
 	double		workmemused;	/* work_mem actually used (bytes) */
 	double		workmemwanted;	/* work_mem to avoid workfile i/o (bytes) */
@@ -985,6 +987,8 @@ cdbexplain_collectStatsFromNode(PlanState *planstate, CdbExplain_SendStatCtx *ct
 	si->total = instr->total;
 	si->ntuples = instr->ntuples;
 	si->nloops = instr->nloops;
+	si->prf_work     = instr->prf_work;
+	si->nfilteredPRF = instr->nfilteredPRF;	
 	si->execmemused = instr->execmemused;
 	si->workmemused = instr->workmemused;
 	si->workmemwanted = instr->workmemwanted;
@@ -1233,6 +1237,8 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
 		instr->total = ntuples.nsimax->total;
 		instr->ntuples = ntuples.nsimax->ntuples;
 		instr->nloops = ntuples.nsimax->nloops;
+		instr->prf_work     = ntuples.nsimax->prf_work;
+		instr->nfilteredPRF = ntuples.nsimax->nfilteredPRF;
 		instr->execmemused = ntuples.nsimax->execmemused;
 		instr->workmemused = ntuples.nsimax->workmemused;
 		instr->workmemwanted = ntuples.nsimax->workmemwanted;

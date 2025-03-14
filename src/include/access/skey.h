@@ -144,6 +144,10 @@ typedef ScanKeyData *ScanKey;
 										 * NULL" */
 #define SK_ORDER_BY			0x0100		/* scankey is for ORDER BY op */
 
+/* for runtime filter */
+#define SK_EMPYT			0x8000	/* scankey is empty */
+#define SK_BLOOM_FILTER		0x4000	/* scankey is for bloom filter */
+
 
 /*
  * prototypes for functions in access/common/scankey.c

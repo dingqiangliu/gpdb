@@ -64,6 +64,12 @@ ExecHashTableExplainBatches(HashJoinTable   hashtable,
 
 static inline void ResetWorkFileSetStatsInfo(HashJoinTable hashtable);
 
+static void BuildRuntimeFilter(HashState *node, TupleTableSlot *slot);
+static void FreeRuntimeFilter(HashState *node);
+static void ResetRuntimeFilter(HashState *node);
+ 
+extern bool gp_enable_runtime_filter_pushdown;
+
 /* ----------------------------------------------------------------
  *		ExecHash
  *
@@ -120,6 +126,9 @@ MultiExecHash(HashState *node)
 		slot = ExecProcNode(outerNode);
 		if (TupIsNull(slot))
 			break;
+
+		if (gp_enable_runtime_filter_pushdown && node->filters)
+			BuildRuntimeFilter(node, slot);
 
 		/* We have to compute the hash value */
 		econtext->ecxt_innertuple = slot;
@@ -256,6 +265,8 @@ ExecEndHash(HashState *node)
 	 */
 	outerPlan = outerPlanState(node);
 	ExecEndNode(outerPlan);
+	if (gp_enable_runtime_filter_pushdown && node->filters)
+		FreeRuntimeFilter(node);
 
 	EndPlanStateGpmonPkt(&node->ps);
 }
@@ -2124,3 +2135,92 @@ static inline void ResetWorkFileSetStatsInfo(HashJoinTable hashtable)
 	hashtable->workset_avg_file_size = 0;
 	hashtable->workset_compression_buf_total = 0;
 }
+
+static void
+BuildRuntimeFilter(HashState *node, TupleTableSlot *slot)
+{
+	Datum val;
+	bool  isnull;
+	ListCell	*lc;
+	AttrFilter	*attr_filter;
+
+	foreach (lc, node->filters)
+	{
+		attr_filter = (AttrFilter *) lfirst(lc);
+
+		val = slot_getattr(slot, attr_filter->rattno, &isnull);
+		if (isnull)
+			continue;
+
+		attr_filter->empty = false;
+
+		if ((int64_t)val < (int64_t)attr_filter->min)
+			attr_filter->min = val;
+
+		if ((int64_t)val > (int64_t)attr_filter->max)
+			attr_filter->max = val;
+
+		if (attr_filter->blm_filter)
+			bloom_add_element(attr_filter->blm_filter, (unsigned char *)&val, sizeof(Datum));
+	}
+}
+
+void
+FreeRuntimeFilter(HashState *node)
+{
+	ListCell	*lc;
+	AttrFilter	*attr_filter;
+
+	if (!node->filters)
+		return;
+
+	foreach (lc, node->filters)
+	{
+		attr_filter = lfirst(lc);
+		if (attr_filter->blm_filter)
+			bloom_free(attr_filter->blm_filter);
+	}
+
+	list_free_deep(node->filters);
+	node->filters = NIL;
+}
+
+void
+ResetRuntimeFilter(HashState *node)
+{
+	ListCell		*lc;
+	AttrFilter		*attr_filter;
+	SeqScanState	*sss;
+
+	if (!node->filters)
+		return;
+
+	foreach (lc, node->filters)
+	{
+		attr_filter = lfirst(lc);
+		attr_filter->empty  = true;
+
+		if (IsA(attr_filter->target, SeqScanState))
+		{
+			sss = castNode(SeqScanState, attr_filter->target);
+			if (sss->filters)
+			{
+				list_free_deep(sss->filters);
+				sss->filters = NIL;
+			}
+		}
+
+		if (attr_filter->blm_filter)
+			bloom_free(attr_filter->blm_filter);
+
+		attr_filter->blm_filter = bloom_create_aggresive(node->ps.plan->plan_rows,
+														 work_mem,
+														 random());
+
+		StaticAssertExpr(sizeof(LONG_MAX) == sizeof(Datum), "sizeof(LONG_MAX) should be equal to sizeof(Datum)");
+		StaticAssertExpr(sizeof(LONG_MIN) == sizeof(Datum), "sizeof(LONG_MIN) should be equal to sizeof(Datum)");
+		attr_filter->min    = LONG_MAX;
+		attr_filter->max    = LONG_MIN;
+	}
+}
+
