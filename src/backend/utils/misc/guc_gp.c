@@ -3190,6 +3190,14 @@ struct config_bool ConfigureNamesBool_gp[] =
 	},
 
 	{
+		{"gp_dispatch_on_mirrors", PGC_USERSET, RESOURCES,
+		},
+		&gp_dispatch_on_mirrors,
+		false, NULL, NULL
+	},
+	
+
+	{
 		{"stats_queue_level", PGC_SUSET, STATS_COLLECTOR,
 			gettext_noop("Collects resource queue-level statistics on database activity."),
 			NULL
