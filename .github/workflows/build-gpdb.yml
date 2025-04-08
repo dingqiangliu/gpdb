@@ -21,10 +21,10 @@ on:
       build_variant:
         description: 'Build variant'
         required: true
-        default: 'stable'
+        default: 'standard'
         type: choice
         options:
-        - stable
+        - standard
         - dwh
         - dwh-patch
 
@@ -53,7 +53,7 @@ jobs:
           echo "=== Parameters Preparation ==="
 
           # Extract current build
-          export CURRENT_BUILD="stable"
+          export CURRENT_BUILD="standard"
           if [[ -n "${{ github.event.inputs.build_variant }}" ]]; then
             export CURRENT_BUILD="${{ github.event.inputs.build_variant }}"
           fi
@@ -116,10 +116,10 @@ jobs:
           # Build result JSON with defaults applied
           ALL_BUILDS='{"include":[
             {
-              "build": "stable"
+              "build": "standard"
             },
             {
-              "build": "stable-test",
+              "build": "standard-test",
               "extra_configure_flags": "--enable-debug-extensions"
             },
             {
