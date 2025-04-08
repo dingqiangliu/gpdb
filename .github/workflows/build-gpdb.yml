@@ -1615,4 +1615,6 @@ jobs:
         run: |
           set -ex pipefail
 
+          DEB_FILE=$(ls "${GITHUB_WORKSPACE}"/deb_build_artifacts/*.deb)
+
           gh release upload ${{ env.CURRENT_REF }} $DEB_FILE
