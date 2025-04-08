@@ -1582,8 +1582,9 @@ jobs:
 
   upload_debian:
     env:
+      GH_TOKEN: ${{ github.token }}
       CURRENT_BUILD: ${{ needs.prepare-parameters.outputs.CURRENT_BUILD }}
-      CURRENT_RELEASE: ${{ needs.prepare-parameters.outputs.CURRENT_RELEASE }}
+      CURRENT_REF: ${{ needs.prepare-parameters.outputs.CURRENT_REF }}
     if: startsWith(needs.prepare-parameters.outputs.CURRENT_RELEASE , 'refs/tags/')
     runs-on: ubuntu-latest
     name: Upload Debian Package
@@ -1610,7 +1611,8 @@ jobs:
           echo "deb_file=${DEB_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.CURRENT_RELEASE }}
-          files: ${DEB_FILE}
+        id: upload-release-asset
+        run: |
+          set -ex pipefail
+
+          gh release upload ${{ env.CURRENT_REF }} $DEB_FILE
