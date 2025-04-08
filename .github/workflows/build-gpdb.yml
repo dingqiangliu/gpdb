@@ -1582,13 +1582,14 @@ jobs:
 
   upload_debian:
     env:
-      GH_TOKEN: ${{ github.token }}
       CURRENT_BUILD: ${{ needs.prepare-parameters.outputs.CURRENT_BUILD }}
       CURRENT_REF: ${{ needs.prepare-parameters.outputs.CURRENT_REF }}
     if: startsWith(needs.prepare-parameters.outputs.CURRENT_RELEASE , 'refs/tags/')
     runs-on: ubuntu-latest
     name: Upload Debian Package
     needs: [prepare-parameters, build, deb-install-test]
+    permissions:
+      contents: write
     steps:
       - name: Download Greenplum debian build artifacts
         uses: actions/download-artifact@v4
@@ -1611,10 +1612,8 @@ jobs:
           echo "deb_file=${DEB_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Release Asset
-        id: upload-release-asset
-        run: |
-          set -ex pipefail
-
-          DEB_FILE=$(ls "${GITHUB_WORKSPACE}"/deb_build_artifacts/*.deb)
-
-          gh release upload ${{ env.CURRENT_REF }} $DEB_FILE
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ github.token }}
+          tag_name: ${{ env.CURRENT_REF }}
+          files: ${DEB_FILE}
