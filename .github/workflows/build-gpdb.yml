@@ -46,6 +46,7 @@ jobs:
     outputs:
       CURRENT_BUILD: ${{ steps.set-parameters.outputs.CURRENT_BUILD }}
       CURRENT_REF: ${{ steps.set-parameters.outputs.CURRENT_REF }}
+      CURRENT_RELEASE: ${{ steps.set-parameters.outputs.CURRENT_RELEASE }}
 
     steps:
       - id: set-parameters
@@ -58,10 +59,13 @@ jobs:
             export CURRENT_BUILD="${{ github.event.inputs.build_variant }}"
           fi
 
+          export CURRENT_RELEASE=""
+
           # Extract current ref
           export CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
           if [[ -n "${{ github.event.inputs.ref }}" ]]; then
             export CURRENT_REF="${{ github.event.inputs.ref }}"
+            export CURRENT_RELEASE=$(git tag -l $CURRENT_REF)
           fi
 
           # Output the current build for GitHub Actions
@@ -1570,12 +1574,13 @@ jobs:
   ## ======================================================================
 
   upload_debian:
-    if: startsWith(github.ref, 'refs/tags/')
+    env:
+      CURRENT_BUILD: ${{ needs.prepare-parameters.outputs.CURRENT_BUILD }}
+      CURRENT_RELEASE: ${{ needs.prepare-parameters.outputs.CURRENT_RELEASE }}
+    if: ${{ needs.prepare-parameters.outputs.CURRENT_RELEASE }}
     runs-on: ubuntu-latest
     name: Upload Debian Package
     needs: [prepare-parameters, build, deb-install-test]
-    env:
-      CURRENT_BUILD: ${{ needs.prepare-parameters.outputs.CURRENT_BUILD }}
     steps:
       - name: Download Greenplum debian build artifacts
         uses: actions/download-artifact@v4
@@ -1600,4 +1605,5 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.CURRENT_RELEASE }}
           files: ${DEB_FILE}
