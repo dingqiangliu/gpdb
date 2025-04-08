@@ -64,8 +64,7 @@ jobs:
           export CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
           if [[ -n "${{ github.event.inputs.ref }}" ]]; then
             export CURRENT_REF="${{ github.event.inputs.ref }}"
-            gh api repos/open-gpdb/gpdb/git/refs/tags/$CURRENT_REF
-            export CURRENT_RELEASE=$(gh api repos/open-gpdb/gpdb/git/refs/tags/$CURRENT_REF)
+            export CURRENT_RELEASE=$(gh api repos/open-gpdb/gpdb/git/refs/tags/$CURRENT_REF -q '.ref')
           fi
 
           # Output the current build for GitHub Actions
@@ -1585,7 +1584,7 @@ jobs:
     env:
       CURRENT_BUILD: ${{ needs.prepare-parameters.outputs.CURRENT_BUILD }}
       CURRENT_RELEASE: ${{ needs.prepare-parameters.outputs.CURRENT_RELEASE }}
-    if: ${{ needs.prepare-parameters.outputs.CURRENT_RELEASE }}
+    if: startsWith(needs.prepare-parameters.outputs.CURRENT_RELEASE , 'refs/tags/')
     runs-on: ubuntu-latest
     name: Upload Debian Package
     needs: [prepare-parameters, build, deb-install-test]
