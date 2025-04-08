@@ -62,7 +62,7 @@ jobs:
           export CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
           if [[ -n "${{ github.event.inputs.ref }}" ]]; then
             export CURRENT_REF="${{ github.event.inputs.ref }}"
-            export CURRENT_RELEASE=$(git tag -l $CURRENT_REF)
+            export CURRENT_RELEASE=$(gh api repos/open-gpdb/gpdb/git/refs/tags/$CURRENT_REF)
           fi
 
           # Output the current build for GitHub Actions
