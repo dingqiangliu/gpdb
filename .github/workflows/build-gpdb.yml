@@ -1616,4 +1616,4 @@ jobs:
         with:
           token: ${{ github.token }}
           tag_name: ${{ env.CURRENT_REF }}
-          files: ${DEB_FILE}
+          files: ${{ steps.verify-artifacts.outputs.deb_file }}
