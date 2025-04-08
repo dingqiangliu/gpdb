@@ -624,7 +624,7 @@ jobs:
 
       - name: Run Greenplum debian package build script
         env:
-          GPDB_VERSION: ${{ github.ref_name }}
+          GPDB_VERSION: ${{ env.CURRENT_REF }}
           BUILD_NUMBER: 1
           SRC_DIR: ${{ github.workspace }}
         run: |
