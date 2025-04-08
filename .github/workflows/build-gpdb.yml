@@ -75,6 +75,10 @@ jobs:
           # Output ref for GitHub Actions
           echo "Current ref configuration:"
           echo "$CURRENT_REF"
+
+          # Output release for GitHub Actions
+          echo "Current release configuration:"
+          echo "$CURRENT_RELEASE"
           # Fix: Use block redirection
           {
             echo "CURRENT_BUILD<<EOF"
