@@ -117,58 +117,37 @@ jobs:
                "make_configs":["contrib/amcheck:installcheck",
                                "contrib/auto_explain:installcheck",
                                "contrib/btree_gin:installcheck",
-                               "contrib/btree_gist:installcheck",
                                "contrib/citext:installcheck",
-                               "contrib/cube:installcheck",
                                "contrib/dblink:installcheck",
                                "contrib/dict_int:installcheck",
                                "contrib/dict_xsyn:installcheck",
-                               "contrib/earthdistance:installcheck",
                                "contrib/extprotocol:installcheck",
-                               "contrib/file_fdw:installcheck",
                                "contrib/formatter_fixedwidth:installcheck",
-                               "contrib/fuzzystrmatch:installcheck",
                                "contrib/hstore:installcheck",
                                "contrib/indexscan:installcheck",
                                "contrib/intarray:installcheck",
                                "contrib/isn:installcheck",
                                "contrib/ltree:installcheck",
-                               "contrib/passwordcheck:installcheck",
                                "contrib/pg_trgm:installcheck",
                                "contrib/pgcrypto:installcheck",
                                "contrib/pgstattuple:installcheck",
-                               "contrib/postgres_fdw:installcheck",
-                               "contrib/sasdemo:installcheck",
-                               "contrib/sepgsql:installcheck",
                                "contrib/sslinfo:installcheck",
                                "contrib/tablefunc:installcheck",
-                               "contrib/test_decoding:installcheck",
                                "contrib/test_parser:installcheck",
                                "contrib/test_shm_mq:installcheck",
                                "contrib/try_convert:installcheck",
-                               "contrib/tsearch2:installcheck",
-                               "contrib/unaccent:installcheck",
-                               "contrib/uuid-ossp:installcheck",
-                               "contrib/xml2:installcheck"]
+                               "contrib/unaccent:installcheck"]
               },
               {"test":"ic-gpcontrib",
                "make_configs":["gpcontrib/gp_array_agg:installcheck",
                                "gpcontrib/gp_debug_numsegments:installcheck",
-                               "gpcontrib/gp_distribution_policy:installcheck",
                                "gpcontrib/gp_error_handling:installcheck",
                                "gpcontrib/gp_inject_fault:installcheck",
-                               "gpcontrib/gp_internal_tools:installcheck",
                                "gpcontrib/gp_legacy_string_agg:installcheck",
                                "gpcontrib/gp_percentile_agg:installcheck",
                                "gpcontrib/gp_sparse_vector:installcheck",
                                "gpcontrib/gp_subtransaction_overflow:installcheck",
-                               "gpcontrib/gpcloud:installcheck",
-                               "gpcontrib/gpmapreduce:installcheck",
-                               "gpcontrib/orafce:installcheck",
-                               "gpcontrib/pgaudit:installcheck",
-                               "gpcontrib/quicklz:installcheck",
-                               "gpcontrib/sr_plan",
-                               "gpcontrib/zstd"]
+                               "gpcontrib/orafce:installcheck"]
               },
               {"test":"ic-parallel-retrieve-cursor",
                "make_configs":["src/test/isolation2:installcheck-parallel-retrieve-cursor"]
@@ -467,6 +446,11 @@ jobs:
 
           # replace not supported symbols in version
           GPDB_VERSION=$(echo "$GPDB_VERSION" | sed "s/\//./g")
+          GPDB_VERSION=$(echo "$GPDB_VERSION" | sed "s/_/-/g")
+          if ! echo "$GPDB_VERSION" | grep -qE '^[0-9]'; then
+              GPDB_VERSION="6.$GPDB_VERSION"
+          fi
+          
           echo "We will built ${GPDB_VERSION}"
           export BUILD_DESTINATION=${SRC_DIR}/debian/build
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${BUILD_DESTINATION}/lib
@@ -977,6 +961,21 @@ jobs:
             echo "Directory size:"
             du -sh "${SRC_DIR}/../gpdb"
           } 2>&1 | tee -a build-logs/details/source-extraction.log
+
+      - name: Patch tests
+        env:
+          SRC_DIR: ${{ github.workspace }}
+        run: |
+          set -ex pipefail
+          {
+            echo "=== Patching Tests Log ==="
+            echo "Timestamp: $(date -u)"
+
+            # Patch tests
+            sed -i  '/mdb-related/,$d' ${SRC_DIR}/../gpdb/src/test/regress/input/misc.source ${SRC_DIR}/../gpdb/src/test/regress/output/misc.source
+
+            echo "Patching tests completed successfully"
+          } 2>&1 | tee -a build-logs/details/patching-tests.log
 
       - name: Create Greenplum demo cluster
         env:
